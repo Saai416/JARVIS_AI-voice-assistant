@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis Voice Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #00d4ff, #7b2ff7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .status {
+            font-size: 1.5em;
+            margin: 30px 0;
+            color: #00d4ff;
+        }
+        
+        .mic-button {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 40px auto;
+            transition: all 0.3s;
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+        }
+        
+        .mic-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 50px rgba(102, 126, 234, 0.8);
+        }
+        
+        .mic-button.listening {
+            animation: pulse 1.5s infinite;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 60px rgba(255, 107, 107, 1);
+            }
+        }
+        
+        .mic-icon {
+            font-size: 4em;
+        }
+        
+        .conversation {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 40px;
+            min-height: 200px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .message {
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .message strong {
+            color: #00d4ff;
+        }
+        
+        .you {
+            color: #fff;
+        }
+        
+        .jarvis {
+            color: #b8b8ff;
+        }
+        
+        .instruction {
+            color: #888;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+            color: #00d4ff;
+            font-size: 1.2em;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 JARVIS</h1>
+        
+        <div class="status" id="status">Ready to listen</div>
+        
+        <button class="mic-button" id="micButton" onclick="startListening()">
+            <div class="mic-icon">🎤</div>
+        </button>
+        
+        <div class="loading" id="loading">Processing...</div>
+        
+        <div class="conversation" id="conversation">
+            <div class="message">
+                <strong>Jarvis:</strong> <span class="jarvis">Hello! I'm ready to assist you. Click the microphone to speak.</span>
+            </div>
+        </div>
+        
+        <div class="instruction">Click the microphone and speak your command</div>
+    </div>
+
+    <script>
+        function addMessage(speaker, text, isUser = false) {
+            const conversation = document.getElementById('conversation');
+            const message = document.createElement('div');
+            message.className = 'message';
+            message.innerHTML = `<strong>${speaker}:</strong> <span class="${isUser ? 'you' : 'jarvis'}">${text}</span>`;
+            conversation.appendChild(message);
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+        
+        async function startListening() {
+            const button = document.getElementById('micButton');
+            const status = document.getElementById('status');
+            const loading = document.getElementById('loading');
+            
+            // Change UI to listening mode
+            button.classList.add('listening');
+            button.disabled = true;
+            status.textContent = '🎤 Listening... Speak now';
+            loading.classList.add('active');
+            
+            try {
+                const response = await fetch('/api/voice');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    addMessage('You', data.command, true);
+                    addMessage('Jarvis', data.response);
+                    status.textContent = 'Ready to listen';
+                } else {
+                    addMessage('System', data.message || 'Could not understand. Please try again.');
+                    status.textContent = 'Ready to listen';
+                }
+            } catch (error) {
+                addMessage('System', 'Error: Could not connect to voice service');
+                status.textContent = 'Ready to listen';
+            }
+            
+            // Reset UI
+            button.classList.remove('listening');
+            button.disabled = false;
+            loading.classList.remove('active');
+        }
+        
+        // Auto-check status
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                if (data.status === 'online') {
+                    document.getElementById('status').textContent = '✅ System Ready';
+                }
+            } catch {
+                document.getElementById('status').textContent = '❌ System Offline';
+            }
+        }
+        
+        checkStatus();
+        
+        // Keyboard shortcut: Space bar to start listening
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !document.getElementById('micButton').disabled) {
+                e.preventDefault();
+                startListening();
+            }
+        });
+    </script>
+</body>
+</html>
